@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>내 근처 최저가 예방접종 찾기</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Noto Sans KR', 'Inter', sans-serif; background-color: #f0f2f5; }
+        .toss-card {
+            background-color: white;
+            border-radius: 1.5rem; /* 24px */
+            padding: 2rem; /* 32px */
+            box-shadow: 0 8px G30px rgba(0, 0, 0, 0.08);
+            transition: all 0.3s ease;
+        }
+        .toss-button {
+            border-radius: 0.75rem; /* 12px */
+            font-weight: 700;
+            transition: all 0.2s ease;
+        }
+        .toss-button:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1); }
+        .accordion-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease-in-out; }
+        .loader {
+            border: 5px solid #e0e7ff;
+            border-top: 5px solid #4f46e5;
+            border-radius: 50%;
+            width: 60px;
+            height: 60px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="text-gray-800">
+
+    <div class="max-w-3xl mx-auto p-4 md:p-6">
+        <!-- 헤더 -->
+        <header class="py-8 text-center">
+            <h1 class="text-4xl md:text-5xl font-black text-gray-800 leading-tight">
+                내 근처 최저가<br>
+                <span class="text-indigo-600">예방접종</span> 병원 찾기
+            </h1>
+            <p class="mt-4 text-gray-500">심평원 데이터로 가장 합리적인 병원을 찾아보세요.</p>
+        </header>
+
+        <!-- 메인 컨트롤 카드 -->
+        <main class="toss-card space-y-8">
+            <div>
+                <h2 class="text-2xl font-bold mb-1">어떤 접종을 찾으세요?</h2>
+                <p class="text-gray-500">궁금한 예방접종 항목을 선택해주세요.</p>
+                <button id="open-vaccine-modal-btn" class="mt-4 w-full flex justify-between items-center text-left bg-gray-100 hover:bg-gray-200 p-4 rounded-xl transition-colors">
+                    <span id="selected-vaccines-display" class="font-semibold text-gray-700">예방접종 항목 선택하기</span>
+                    <i class="fa-solid fa-chevron-right text-gray-500"></i>
+                </button>
+            </div>
+
+            <div>
+                 <h2 class="text-2xl font-bold mb-4">어디에서 맞으세요?</h2>
+                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label for="sido-select" class="text-sm font-medium text-gray-700">시/도</label>
+                        <select id="sido-select" class="mt-1 w-full p-3 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    </div>
+                     <div>
+                        <label for="sggu-select" class="text-sm font-medium text-gray-700">시/군/구</label>
+                        <select id="sggu-select" class="mt-1 w-full p-3 border border-gray-200 rounded-lg bg-gray-100 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500" disabled></select>
+                    </div>
+                     <div class="sm:col-span-2">
+                        <label for="hospital-type-select" class="text-sm font-medium text-gray-700">병원 종류 (선택)</label>
+                        <select id="hospital-type-select" class="mt-1 w-full p-3 border border-gray-200 rounded-lg bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"></select>
+                    </div>
+                 </div>
+            </div>
+
+            <button id="search-btn" class="w-full bg-indigo-600 text-white text-lg py-4 toss-button">
+                <i class="fa-solid fa-magnifying-glass mr-2"></i>조회하기
+            </button>
+        </main>
+        
+        <!-- 결과 영역 -->
+        <section id="result-section" class="mt-10">
+            <div id="loader" class="hidden justify-center items-center py-10 flex-col">
+                <div class="loader"></div>
+                <p id="loader-message" class="mt-4 text-gray-600 font-semibold">병원 찾는 중...</p>
+            </div>
+
+            <div id="result-message" class="hidden text-center py-16">
+                 <div class="text-5xl mb-4">😅</div>
+                 <p class="text-xl font-bold text-gray-700">검색 결과가 없어요</p>
+                 <p class="text-gray-500 mt-2">다른 조건으로 다시 검색해보세요!</p>
+            </div>
+            
+            <div id="result-container" class="hidden">
+                 <div class="mb-6 flex justify-between items-center">
+                    <h2 class="text-2xl font-bold">검색 결과 <span id="result-count" class="text-indigo-600">0</span></h2>
+                    <select id="sort-select" class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-indigo-500">
+                        <option value="price_asc">가격 낮은순</option>
+                        <option value="price_desc">가격 높은순</option>
+                        <option value="name_asc">이름순</option>
+                    </select>
+                </div>
+                <div id="result-list" class="space-y-4">
+                    <!-- 결과 카드가 여기에 동적으로 추가됩니다. -->
+                </div>
+            </div>
+        </section>
+
+    </div>
+
+    <!-- 예방접종 선택 모달 -->
+    <div id="vaccine-modal" class="fixed inset-0 bg-black bg-opacity-60 hidden justify-center items-center p-4 z-50">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden">
+            <header class="p-5 border-b flex justify-between items-center">
+                <h2 class="text-xl font-bold">예방접종 선택</h2>
+                <button id="close-vaccine-modal-btn" class="text-gray-400 hover:text-gray-700 text-2xl">&times;</button>
+            </header>
+            <div id="vaccine-tree-container" class="p-2 sm:p-4 overflow-y-auto">
+                <div id="vaccine-tree-loader" class="flex justify-center items-center p-8"><div class="loader"></div></div>
+            </div>
+            <footer class="p-4 bg-gray-50 border-t">
+                <button id="apply-selection-btn" class="w-full bg-indigo-600 text-white text-lg py-3 toss-button">선택 완료</button>
+            </footer>
+        </div>
+    </div>
+
+    <script>
+        const API = {
+            CODE: 'https://apis.data.go.kr/B551182/nonPaymentDamtInfoService/getNonPaymentItemCodeList2',
+            HOSP: 'https://apis.data.go.kr/B551182/nonPaymentDamtInfoService/getNonPaymentItemHospList2',
+            KEY: '1GfsTIIMFiekflcfACHmDYWdvnysQzqtwj+YDYvTxihHrxEOZM13CrEIkprA6Q8lqOlDOkOP3ouzoPiuuPu6Cw=='
+        };
+        const CACHE_KEY = 'vaccineDataCache';
+        const hospitalTypes = { "01": "상급종합", "11": "종합병원", "21": "병원", "31": "의원", "41": "치과병원", "42": "치과의원", "51": "한방병원", "61": "한의원", "71": "요양병원" };
+        const locationData = { "110000": { name: "서울특별시", sggu: { "110016": "강남구", "110002": "강동구", "110003": "강북구", "110004": "강서구", "110005": "관악구", "110006": "광진구", "110007": "구로구", "110008": "금천구", "110009": "노원구", "110010": "도봉구", "110011": "동대문구", "110012": "동작구", "110013": "마포구", "110014": "서대문구", "110015": "서초구", "110017": "성동구", "110018": "성북구", "110019": "송파구", "110020": "양천구", "110021": "영등포구", "110022": "용산구", "110023": "은평구", "110001": "종로구", "110024": "중구", "110025": "중랑구" }}, "260000": { name: "부산광역시", sggu: { "260005": "강서구", "260006": "금정구", "260007": "기장군", "260008": "남구", "260009": "동구", "260010": "동래구", "260011": "부산진구", "260012": "북구", "260013": "사상구", "260014": "사하구", "260001": "서구", "260015": "수영구", "260016": "연제구", "260002": "영도구", "260003": "중구", "260004": "해운대구" }}, "270000": { name: "대구광역시", sggu: { "270003": "남구", "270004": "달서구", "270005": "달성군", "270006": "동구", "270007": "북구", "270001": "서구", "270008": "수성구", "270002": "중구" }}, "280000": { name: "인천광역시", sggu: { "280003": "강화군", "280004": "계양구", "280005": "남동구", "280006": "동구", "280007": "미추홀구", "280008": "부평구", "280009": "서구", "280010": "연수구", "280002": "옹진군", "280001": "중구" }}, "290000": { name: "광주광역시", sggu: { "290002": "광산구", "290003": "남구", "290004": "동구", "290005": "북구", "290001": "서구" }}, "300000": { name: "대전광역시", sggu: { "300002": "대덕구", "300003": "동구", "300004": "서구", "300005": "유성구", "300001": "중구" }}, "310000": { name: "울산광역시", sggu: { "310002": "남구", "310003": "동구", "310004": "북구", "310005": "울주군", "310001": "중구" }}, "360000": { name: "세종특별자치시", sggu: {}}, "410000": { name: "경기도", sggu: { "410004": "가평군", "410005": "고양시", "410006": "과천시", "410007": "광명시", "410008": "광주시", "410009": "구리시", "410010": "군포시", "410011": "김포시", "410012": "남양주시", "410013": "동두천시", "410014": "부천시", "410015": "성남시", "410016": "수원시", "410017": "시흥시", "410018": "안산시", "410019": "안성시", "410020": "안양시", "410021": "양주시", "410022": "양평군", "410023": "여주시", "410024": "연천군", "410025": "오산시", "410026": "용인시", "410027": "의왕시", "410028": "의정부시", "410029": "이천시", "410030": "파주시", "410031": "평택시", "410032": "포천시", "410033": "하남시", "410034": "화성시" }}, "420000": { name: "강원도", sggu: { "420002": "강릉시", "420003": "고성군", "420004": "동해시", "420005": "삼척시", "420006": "속초시", "420007": "양구군", "420008": "양양군", "420009": "영월군", "420010": "원주시", "420011": "인제군", "420012": "정선군", "420013": "철원군", "420001": "춘천시", "420014": "태백시", "420015": "평창군", "420016": "홍천군", "420017": "화천군", "420018": "횡성군" }}, "430000": { name: "충청북도", sggu: { "430003": "괴산군", "430004": "단양군", "430005": "보은군", "430006": "영동군", "430007": "옥천군", "430008": "음성군", "430009": "제천시", "430010": "증평군", "430011": "진천군", "430001": "청주시", "430002": "충주시" }}, "440000": { name: "충청남도", sggu: { "440003": "계룡시", "440004": "공주시", "440005": "금산군", "440006": "논산시", "440007": "당진시", "440008": "보령시", "440009": "부여군", "440010": "서산시", "440011": "서천군", "440012": "아산시", "440014": "예산군", "440001": "천안시", "440015": "청양군", "440016": "태안군", "440017": "홍성군" }}, "450000": { name: "전라북도", sggu: { "450003": "고창군", "450004": "군산시", "450005": "김제시", "450006": "남원시", "450007": "무주군", "450008": "부안군", "450009": "순창군", "450010": "완주군", "450011": "익산시", "450012": "임실군", "450013": "장수군", "450001": "전주시", "450014": "정읍시", "450015": "진안군" }}, "460000": { name: "전라남도", sggu: { "460003": "강진군", "460004": "고흥군", "460005": "곡성군", "460006": "광양시", "460007": "구례군", "460008": "나주시", "460009": "담양군", "460001": "목포시", "460010": "무안군", "460011": "보성군", "460012": "순천시", "460013": "신안군", "460002": "여수시", "460014": "영광군", "460015": "영암군", "460016": "완도군", "460017": "장성군", "460018": "장흥군", "460019": "진도군", "460020": "함평군", "460021": "해남군", "460022": "화순군" }}, "470000": { name: "경상북도", sggu: { "470002": "경산시", "470003": "경주시", "470004": "고령군", "470005": "구미시", "470006": "군위군", "470007": "김천시", "470008": "문경시", "470009": "봉화군", "470010": "상주시", "470011": "성주군", "470012": "안동시", "470013": "영덕군", "470014": "영양군", "470015": "영주시", "470016": "영천시", "470017": "예천군", "470018": "울릉군", "470019": "울진군", "470020": "의성군", "470021": "청도군", "470022": "청송군", "470023": "칠곡군", "470001": "포항시" }}, "480000": { name: "경상남도", sggu: { "480003": "거제시", "480004": "거창군", "480005": "고성군", "480006": "김해시", "480007": "남해군", "480008": "밀양시", "480009": "사천시", "480010": "산청군", "480011": "양산시", "480012": "의령군", "480013": "진주시", "480001": "창원시", "480014": "창녕군", "480015": "통영시", "480016": "하동군", "480017": "함안군", "480018": "함양군", "480019": "합천군" }}, "500000": { name: "제주특별자치도", sggu: { "500001": "서귀포시", "500002": "제주시" }} };
+        let currentResults = [];
+
+        const D = {
+            loader: document.getElementById('loader'), loaderMessage: document.getElementById('loader-message'),
+            resultMsg: document.getElementById('result-message'), resultContainer: document.getElementById('result-container'),
+            resultList: document.getElementById('result-list'), resultCount: document.getElementById('result-count'),
+            modal: { el: document.getElementById('vaccine-modal'), openBtn: document.getElementById('open-vaccine-modal-btn'), closeBtn: document.getElementById('close-vaccine-modal-btn'), treeContainer: document.getElementById('vaccine-tree-container'), applyBtn: document.getElementById('apply-selection-btn') },
+            filters: { hospType: document.getElementById('hospital-type-select'), sido: document.getElementById('sido-select'), sggu: document.getElementById('sggu-select'), sort: document.getElementById('sort-select') },
+            searchBtn: document.getElementById('search-btn'), selectedVaccinesDisplay: document.getElementById('selected-vaccines-display')
+        };
+        
+        const showLoader = (msg) => { D.loaderMessage.textContent = msg; D.loader.style.display = 'flex'; D.resultContainer.classList.add('hidden'); D.resultMsg.classList.add('hidden'); };
+        const hideLoader = () => D.loader.style.display = 'none';
+        const showMessage = () => { D.resultList.innerHTML = ''; D.resultContainer.classList.add('hidden'); D.resultMsg.classList.remove('hidden'); };
+        const formatPrice = (p) => { const n = Number(p); return (!isNaN(n) && n > 0) ? `${n.toLocaleString('ko-KR')}원` : '문의'; };
+        const formatDate = (d) => d && d.length === 8 ? `${d.substring(0,4)}.${d.substring(4,6)}.${d.substring(6,8)}` : '-';
+
+        async function getGroupedVaccineData() {
+            const cachedData = sessionStorage.getItem(CACHE_KEY);
+            if (cachedData) return JSON.parse(cachedData);
+            
+            const url = `${API.CODE}?serviceKey=${encodeURIComponent(API.KEY)}&numOfRows=999`;
+            const response = await fetch(url);
+            const xmlString = await response.text();
+            const xmlDoc = new DOMParser().parseFromString(xmlString, "application/xml");
+            
+            if (xmlDoc.querySelector('resultCode').textContent !== '00') throw new Error("API에서 데이터를 가져오지 못했습니다.");
+            
+            const vaccineKeywords = ['접종', '백신', '가다실', '서바릭스', '자궁경부암', '인플루엔자', '독감', '대상포진', '프리베나', '신플로릭스', '로타'];
+            const groups = {};
+
+            Array.from(xmlDoc.querySelectorAll('item')).forEach(item => {
+                const fullName = item.querySelector('npayKorNm')?.textContent;
+                if (!fullName || !vaccineKeywords.some(kw => fullName.includes(kw))) return;
+                
+                let cleanName = fullName.startsWith('예방접종료/') ? fullName.substring(6) : fullName;
+                const code = item.querySelector('npayCd').textContent;
+                const parts = cleanName.split('/');
+                const groupName = parts[0];
+                
+                if (groupName === "예방접종료") return;
+
+                if (!groups[groupName]) groups[groupName] = { code: null, children: {} };
+                if (parts.length === 1) groups[groupName].code = code;
+                else groups[groupName].children[parts.slice(1).join('/')] = { code };
+            });
+            
+            sessionStorage.setItem(CACHE_KEY, JSON.stringify(groups));
+            return groups;
+        }
+        
+        function buildVaccineTreeUI(groups) {
+            D.modal.treeContainer.innerHTML = '';
+            const sortedGroupNames = Object.keys(groups).sort((a,b) => a.localeCompare(b));
+
+            sortedGroupNames.forEach(groupName => {
+                const group = groups[groupName];
+                const hasChildren = Object.keys(group.children).length > 0;
+                
+                const groupDiv = document.createElement('div');
+                groupDiv.className = 'border-b last:border-b-0';
+                const header = document.createElement('div');
+                header.className = 'flex items-center p-4 cursor-pointer hover:bg-gray-100';
+                
+                header.innerHTML = `
+                    <input type="checkbox" class="form-checkbox h-5 w-5 text-indigo-600 rounded-md mr-4 parent-check" data-group-name="${groupName}">
+                    <span class="font-semibold flex-1">${groupName}</span>
+                    ${hasChildren ? '<i class="fa-solid fa-chevron-down text-gray-400 transition-transform"></i>' : ''}`;
+                groupDiv.appendChild(header);
+
+                if(hasChildren) {
+                    const content = document.createElement('div');
+                    content.className = 'accordion-content bg-gray-50/70 pl-10 pr-4 py-1';
+                    const sortedChildNames = Object.keys(group.children).sort();
+                    sortedChildNames.forEach(childName => {
+                        const child = group.children[childName];
+                        content.innerHTML += `
+                            <label class="flex items-center p-3 hover:bg-gray-200/70 rounded-md">
+                                <input type="checkbox" class="form-checkbox h-4 w-4 text-indigo-500 rounded-md mr-3 child-check" data-code="${child.code}" data-parent-group="${groupName}" data-name="${childName}">
+                                <span class="text-sm">${childName}</span></label>`;
+                    });
+                    groupDiv.appendChild(content);
+                }
+                D.modal.treeContainer.appendChild(groupDiv);
+            });
+        }
+
+        async function searchHospitals() {
+            const codesToSearch = new Map(); // Use Map to store {code: name} to avoid duplicates
+            
+            // Get checked parent groups
+            D.modal.treeContainer.querySelectorAll('.parent-check:checked').forEach(pcb => {
+                const groupName = pcb.dataset.groupName;
+                const groupData = window.vaccineData[groupName];
+                
+                // Add all children of the checked parent group
+                Object.entries(groupData.children).forEach(([childName, childData]) => {
+                    codesToSearch.set(childData.code, childName);
+                });
+                // If the parent itself is a vaccine (has a code and no children), add it
+                if (groupData.code && Object.keys(groupData.children).length === 0) {
+                     codesToSearch.set(groupData.code, groupName);
+                }
+            });
+
+            // Get individually checked children (if their parent is not checked)
+            D.modal.treeContainer.querySelectorAll('.child-check:checked').forEach(ccb => {
+                const parentCb = D.modal.treeContainer.querySelector(`.parent-check[data-group-name="${ccb.dataset.parentGroup}"]`);
+                if (!parentCb.checked) {
+                    codesToSearch.set(ccb.dataset.code, ccb.dataset.name);
+                }
+            });
+
+            if (codesToSearch.size === 0) {
+                showMessage("예방접종 항목을 선택해주세요.");
+                return;
+            }
+
+            showLoader(`${codesToSearch.size}개 항목 코드를 검색 중입니다...`);
+            
+            const searchParams = { clCd: D.filters.hospType.value, sidoCd: D.filters.sido.value, sgguCd: D.filters.sggu.value };
+            // Create an array of promises, passing both code and name
+            const promises = Array.from(codesToSearch.entries()).map(([code, name]) => fetchHospitalDataForCode({code, name}, searchParams));
+            
+            try {
+                const results = await Promise.all(promises);
+                const allItems = results.flat();
+                
+                const mergedHospitals = {};
+                allItems.forEach(item => {
+                    const ykiho = item.ykiho;
+                    if (!mergedHospitals[ykiho]) {
+                        mergedHospitals[ykiho] = {
+                            yadmNm: item.yadmNm, clCdNm: item.clCdNm,
+                            vaccines: []
+                        };
+                    }
+                    mergedHospitals[ykiho].vaccines.push({
+                        name: item.vaccineName,
+                        minPrc: item.minPrc,
+                        maxPrc: item.maxPrc,
+                        adtFrDd: item.adtFrDd
+                    });
+                });
+                
+                // Calculate overall price range for sorting
+                currentResults = Object.values(mergedHospitals).map(hosp => {
+                    const prices = hosp.vaccines.map(v => v.minPrc).filter(p => p > 0);
+                    hosp.overallMinPrc = prices.length > 0 ? Math.min(...prices) : 0;
+                    return hosp;
+                });
+
+                displayResults();
+            } catch (error) {
+                showMessage(`오류 발생: ${error.message}`);
+            } finally {
+                hideLoader();
+            }
+        }
+
+        async function fetchHospitalDataForCode(vaccineInfo, params) {
+            let url = new URL(API.HOSP);
+            url.searchParams.set('serviceKey', API.KEY);
+            url.searchParams.set('itemCd', vaccineInfo.code);
+            url.searchParams.set('numOfRows', 500);
+            if (params.clCd) url.searchParams.set('clCd', params.clCd);
+            if (params.sidoCd) url.searchParams.set('sidoCd', params.sidoCd);
+            if (params.sgguCd) url.searchParams.set('sgguCd', params.sgguCd);
+
+            try {
+                const response = await fetch(url);
+                const xmlString = await response.text();
+                const xmlDoc = new DOMParser().parseFromString(xmlString, "application/xml");
+                if (xmlDoc.querySelector('resultCode').textContent !== '00') return [];
+                
+                // Return a mapped array with necessary info
+                return Array.from(xmlDoc.querySelectorAll('item')).map(item => ({
+                    vaccineName: vaccineInfo.name, // Add the vaccine name to each hospital item
+                    ykiho: item.querySelector('ykiho').textContent,
+                    yadmNm: item.querySelector('yadmNm').textContent,
+                    clCdNm: item.querySelector('clCdNm').textContent,
+                    minPrc: Number(item.querySelector('minPrc')?.textContent || '0'),
+                    maxPrc: Number(item.querySelector('maxPrc')?.textContent || '0'),
+                    adtFrDd: item.querySelector('adtFrDd')?.textContent
+                }));
+            } catch(e) {
+                console.error(`Failed to fetch for code ${vaccineInfo.code}:`, e);
+                return []; // Return empty array on fetch error
+            }
+        }
+
+        function displayResults() {
+            const sortedItems = [...currentResults].sort((a, b) => {
+                switch (D.filters.sort.value) {
+                    case 'price_desc':
+                        const maxA = Math.max(...a.vaccines.map(v => v.maxPrc));
+                        const maxB = Math.max(...b.vaccines.map(v => v.maxPrc));
+                        return maxB - maxA;
+                    case 'name_asc': return a.yadmNm.localeCompare(b.yadmNm);
+                    default: return (a.overallMinPrc || Infinity) - (b.overallMinPrc || Infinity);
+                }
+            });
+
+            D.resultList.innerHTML = '';
+            D.resultCount.textContent = sortedItems.length;
+
+            if (sortedItems.length === 0) {
+                showMessage();
+                return;
+            }
+            D.resultContainer.classList.remove('hidden');
+            D.resultMsg.classList.add('hidden');
+            
+            sortedItems.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "toss-card";
+                
+                const vaccineListHtml = item.vaccines.sort((a,b) => a.minPrc - b.minPrc).map(v => `
+                    <div class="py-3 flex justify-between items-center text-sm">
+                        <span class="font-medium text-gray-700">${v.name}</span>
+                        <div class="text-right">
+                           <span class="font-bold text-gray-800">${formatPrice(v.minPrc)} ${v.maxPrc > v.minPrc ? ` ~ ${formatPrice(v.maxPrc)}` : ''}</span>
+                           <p class="text-xs text-gray-400">기준일: ${formatDate(v.adtFrDd)}</p>
+                        </div>
+                    </div>
+                `).join('<hr class="border-gray-100">');
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-start gap-4">
+                        <div class="flex-1">
+                            <p class="text-sm font-semibold text-indigo-600">${item.clCdNm}</p>
+                            <h3 class="text-xl font-bold mt-1">${item.yadmNm}</h3>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                             <p class="text-lg sm:text-xl font-bold text-gray-800">${formatPrice(item.overallMinPrc)} ~</p>
+                        </div>
+                    </div>
+                    <div class="mt-4 border-t border-gray-100">
+                        ${vaccineListHtml}
+                    </div>
+                `;
+                D.resultList.appendChild(card);
+            });
+        }
+
+        function setupEventListeners() {
+            D.modal.openBtn.onclick = () => D.modal.el.style.display = 'flex';
+            D.modal.closeBtn.onclick = () => D.modal.el.style.display = 'none';
+            D.modal.applyBtn.onclick = () => {
+                const selectedNames = Array.from(D.modal.treeContainer.querySelectorAll('.child-check:checked')).map(cb => cb.dataset.name);
+                const parentOnlySelected = Array.from(D.modal.treeContainer.querySelectorAll('.parent-check:checked')).filter(pcb => !D.modal.treeContainer.querySelector(`.child-check[data-parent-group="${pcb.dataset.groupName}"]:checked`)).map(pcb => pcb.dataset.groupName);
+                const allSelections = [...new Set([...parentOnlySelected, ...selectedNames])];
+                D.selectedVaccinesDisplay.textContent = allSelections.length > 0 ? `${allSelections[0]}` + (allSelections.length > 1 ? ` 외 ${allSelections.length - 1}건` : '') : '예방접종 항목 선택하기';
+                D.modal.el.style.display = 'none';
+            };
+
+            D.modal.treeContainer.addEventListener('click', (e) => {
+                const target = e.target;
+                if (target.closest('.flex.items-center.p-4')) {
+                    const header = target.closest('.flex.items-center.p-4');
+                    const content = header.nextElementSibling;
+                    const icon = header.querySelector('i');
+                    if (content?.classList.contains('accordion-content')) {
+                        content.style.maxHeight = content.style.maxHeight ? null : content.scrollHeight + "px";
+                        icon?.classList.toggle('rotate-180');
+                    }
+                }
+                if (target.classList.contains('parent-check')) {
+                    D.modal.treeContainer.querySelectorAll(`.child-check[data-parent-group="${target.dataset.groupName}"]`).forEach(child => child.checked = target.checked);
+                }
+                if (target.classList.contains('child-check')) {
+                    const groupName = target.dataset.parentGroup;
+                    const parent = D.modal.treeContainer.querySelector(`.parent-check[data-group-name="${groupName}"]`);
+                    const allChildren = D.modal.treeContainer.querySelectorAll(`.child-check[data-parent-group="${groupName}"]`);
+                    const allChecked = Array.from(allChildren).every(child => child.checked);
+                    const someChecked = Array.from(allChildren).some(child => child.checked);
+                    parent.checked = allChecked;
+                    parent.indeterminate = !allChecked && someChecked;
+                }
+            });
+            
+            D.filters.sido.onchange = () => {
+                const selectedSido = D.filters.sido.value;
+                D.filters.sggu.innerHTML = '<option value="">시/군/구 전체</option>';
+                D.filters.sggu.disabled = true;
+                D.filters.sggu.classList.add('bg-gray-100');
+                if (selectedSido && locationData[selectedSido].sggu && Object.keys(locationData[selectedSido].sggu).length > 0) {
+                    D.filters.sggu.disabled = false;
+                    D.filters.sggu.classList.remove('bg-gray-100');
+                    Object.entries(locationData[selectedSido].sggu).forEach(([code, name]) => D.filters.sggu.add(new Option(name, code)));
+                }
+            };
+
+            D.filters.sort.onchange = displayResults;
+            D.searchBtn.onclick = searchHospitals;
+        }
+
+        async function initialize() {
+            try {
+                window.vaccineData = await getGroupedVaccineData();
+                buildVaccineTreeUI(window.vaccineData);
+            } catch (e) {
+                D.modal.treeContainer.innerHTML = `<p class="text-red-500 text-center">${e.message}</p>`;
+            }
+            D.filters.hospType.innerHTML = `<option value="">병원 종류 전체</option>`;
+            Object.entries(hospitalTypes).forEach(([code, name]) => D.filters.hospType.add(new Option(name, code)));
+            D.filters.sido.innerHTML = `<option value="">시/도 전체</option>`;
+            Object.entries(locationData).forEach(([code, data]) => D.filters.sido.add(new Option(data.name, code)));
+            setupEventListeners();
+        }
+
+        document.addEventListener('DOMContentLoaded', initialize);
+    </script>
+</body>
+</html>
